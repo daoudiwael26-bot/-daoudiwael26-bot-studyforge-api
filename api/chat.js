@@ -6,8 +6,17 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
 
   try {
-    const { messages, system, max_tokens } = req.body;
-    if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages requis' });
+    // Vercel parse automatiquement le body JSON
+    const { messages, system, max_tokens } = req.body || {};
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages requis et doit être un tableau non vide' });
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Clé API non configurée sur le serveur' });
+    }
 
     const body = {
       model: 'claude-haiku-4-5-20251001',
@@ -20,16 +29,19 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify(body)
     });
 
     const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || 'Erreur API' });
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data?.error?.message || 'Erreur API Anthropic' });
+    }
     return res.status(200).json(data);
+
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Erreur serveur' });
+    return res.status(500).json({ error: err.message || 'Erreur serveur interne' });
   }
 }
